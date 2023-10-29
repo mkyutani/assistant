@@ -1,3 +1,16 @@
+# Local files and directories
+.env
+.venv
+*.log
+*.tmp
+*.bak
+env/
+ENV/
+venv/
+log/
+tmp/
+volumes/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
