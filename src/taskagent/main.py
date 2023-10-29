@@ -18,7 +18,6 @@ def main():
 
     parser = argparse.ArgumentParser(description='Task agent')
     parser.add_argument('issue', nargs='?', default=None, help='issue')
-#    parser.add_argument('--simple', action='store_true', help='simple query')
     parser.add_argument('--verbose', action='store_true', help='verbose')
     args = parser.parse_args()
 
