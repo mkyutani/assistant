@@ -1,21 +1,10 @@
+import argparse
 import io
 import os
 import sys
-from distutils.util import strtobool
 from dotenv import load_dotenv
-from langchain.prompts import PromptTemplate
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import LLMChain
 
-load_dotenv()
-openai_key = os.environ['OPENAI_API_KEY']
-verbose = strtobool(os.environ.get('VERBOSE', 'False'))
-
-llm = ChatOpenAI(model_name='gpt-3.5-turbo')
-
-template = '''
-{text}
-'''
+import tools
 
 def set_io_buffers():
     sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
@@ -25,11 +14,24 @@ def set_io_buffers():
 def main():
     set_io_buffers()
 
-    prompt = PromptTemplate(
-        input_variables=['text'],
-        template=template,
-    )
+    load_dotenv()
 
-    chain = LLMChain(llm=llm, prompt=prompt, verbose=verbose)
+    parser = argparse.ArgumentParser(description='Task agent')
+    parser.add_argument('issue', nargs='?', default=None, help='issue')
+#    parser.add_argument('--simple', action='store_true', help='simple query')
+    parser.add_argument('--verbose', action='store_true', help='verbose')
+    args = parser.parse_args()
 
-    print(chain(sys.stdin.read())['text'])
+    if args.issue is None:
+        text = sys.stdin.read()
+        response = tools.Simple().chat(text, args.verbose)
+        print(response)
+    else:
+        tool_definition = tools.definitions.get(args.issue)
+        if tool_definition is None:
+            print('No such an issue', file=sys.stderr)
+        else:
+            tool = tools.create_instance(tool_definition)
+            text = sys.stdin.read()
+            response = tool.chat(text, args.verbose)
+            print(response)
