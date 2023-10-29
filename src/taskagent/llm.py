@@ -17,7 +17,6 @@ class LLM:
 
     @classmethod
     def get_instance(cls):
-        # インスタンス未生成の場合
         if not cls._only_instance:
             cls._only_instance = cls.__internal_new__()
         return cls._only_instance
