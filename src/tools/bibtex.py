@@ -19,7 +19,11 @@ BibTex style reference: {reference}
 
 ### Output format
 
-APA Style:
+APA style:
+ACM style:
+plain style:
+abbrev style:
+alpha style:
 '''
 
         prompt = PromptTemplate(
