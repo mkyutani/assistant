@@ -2,6 +2,7 @@
     "cSpell.words": [
         "dotenv",
         "langchain",
+        "loguru",
         "openai",
         "taskagent"
     ]

@@ -1,8 +1,7 @@
 import argparse
 import io
-import os
 import sys
-from dotenv import load_dotenv
+from taskagent.env import Env
 
 import tools
 
@@ -14,7 +13,7 @@ def set_io_buffers():
 def main():
     set_io_buffers()
 
-    load_dotenv()
+    Env.init()
 
     parser = argparse.ArgumentParser(description='Task agent')
     parser.add_argument('issue', nargs='?', default=None, help='issue')
