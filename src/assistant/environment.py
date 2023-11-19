@@ -35,8 +35,13 @@ class Env:
                 print(value, file=fd)
 
     def load_strings(self, property):
-        with open(f'{self._data_dir}/{property}', 'r') as fd:
-            values = fd.readlines()
+        try:
+            with open(f'{self._data_dir}/{property}', 'r') as fd:
+                values = fd.readlines()
+            values = [v.strip() for v in values]
+            return values
+        except Exception as e:
+            return None
 
 env = Env()
 logger = Env().logger()

@@ -1,5 +1,3 @@
-import json
-import os
 import re
 import sys
 from time import sleep
@@ -15,9 +13,10 @@ def add_assistant_parsers(subparser):
     create_parser.add_argument('-f', '--file_ids', help='file ids (comma separated)')
     create_parser.add_argument('-i', '--instruction', help='instructions')
     create_parser.add_argument('-n', '--name', help='name')
-    query_parser = subparser.add_parser('query', help='ask assistants')
-    query_parser.add_argument('id', default=None, help='assistant id')
-    query_parser.add_argument('-q', '--query', default=None, help='query string')
+    talk_parser = subparser.add_parser('talk', help='conversation with assistants')
+    talk_parser.add_argument('id', nargs='?', help='assistant id')
+    talk_parser.add_argument('-m', '--message', default=None, help='message to assistant')
+    talk_parser.add_argument('-R', '--restart', action='store_true', help='restart conversation')
     return subparser
 
 def list_assistants(args):
@@ -60,55 +59,59 @@ def create_assistant(args):
 
     print(assistant.id)
 
-def query_assistant(args):
-    if args.query:
-        query = args.query
+def talk_assistant(args):
+    restarted = args.restart
+    if args.message:
+        message = args.message
     else:
-        query = sys.stdin.read()
+        message = sys.stdin.read()
+
+    assistant_id = None
+    thread_id = None
+    latest_assistant_info = env.load_strings('assistant')
     if args.id:
         assistant_id = args.id
+    elif latest_assistant_info is not None and len(latest_assistant_info) > 0:
+        assistant_id = latest_assistant_info[0]
+        if (not restarted) and len(latest_assistant_info) > 1:
+            thread_id = latest_assistant_info[1]
     else:
-        assistant_id = env.load_strings('assistant')[0]
+        env.logger.error('Talk assistant: No assistant ID')
+        return 1
 
-    assistant = openai.beta.assistants.retrieve(assistant_id=assistant_id)
-    logger.debug(f'Retrieve assistant object: {assistant}')
-
-    files = []
-    for file_id in assistant.file_ids:
-        file = openai.files.retrieve(file_id)
-        logger.debug(f'Retrieve file object: {file}')
-        files.append(file)
-
-    thread = openai.beta.threads.create()
-    logger.debug(f'Create thread object: {thread}')
+    if thread_id is None:
+        thread = openai.beta.threads.create()
+        logger.debug(f'Create thread: {thread}')
+        thread_id = thread.id
+        env.save_strings('assistant', [assistant_id, thread_id])
 
     message = openai.beta.threads.messages.create(
-        thread_id=thread.id,
+        thread_id=thread_id,
         role="user",
-        content=query
+        content=message
     )
-    logger.debug(f'Create message object: {message}')
+    logger.debug(f'Create message: {message}')
 
     run = openai.beta.threads.runs.create(
-        thread_id=thread.id,
-        assistant_id=assistant.id
+        thread_id=thread_id,
+        assistant_id=assistant_id
     )
-    logger.debug(f'Create run object: {run}')
+    logger.debug(f'Create run: {run}')
 
     status = 'in_progress'
     while status == 'in_progress':
         sleep(10)
         result = openai.beta.threads.runs.retrieve(
-            thread_id=thread.id,
+            thread_id=thread_id,
             run_id=run.id
         )
-        logger.debug(f'Retrieve run object: {result}')
+        logger.debug(f'Retrieve run: {result}')
         status = result.status
 
     if status != 'completed':
         logger.error(f'Failed to retrieve, status={status}')
     else:
-        thread_messages = openai.beta.threads.messages.list(thread.id)
+        thread_messages = openai.beta.threads.messages.list(thread_id)
         logger.debug(f'List thread messages: {thread_messages}')
 
         data_index = 1
@@ -120,7 +123,7 @@ def query_assistant(args):
             note_index = 1
             for annotation in annotations:
                 note_mark = f'[{note_index}]'
-                filename = [f.filename for f in files if f.id == annotation.file_citation.file_id][0]
+                filename = openai.files.retrieve(annotation.file_citation.file_id).filename
                 quote = annotation.file_citation.quote
                 footnotes.append(f'{note_mark} In {filename}.\n{quote}')
                 answer = answer.replace(annotation.text, note_mark)

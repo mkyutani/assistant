@@ -5,13 +5,13 @@ import sys
 from time import sleep
 from dotenv import load_dotenv
 
-from assistant.assistant import add_assistant_parsers, create_assistant, list_assistants, query_assistant
+from assistant.assistant import add_assistant_parsers, create_assistant, list_assistants, talk_assistant
 from assistant.file import add_file_parsers, create_file, list_files
 
 command_functions = {
     'list': list_assistants,
     'create': create_assistant,
-    'query': query_assistant,
+    'talk': talk_assistant,
     'file': {
         'list': list_files,
         'create': create_file
