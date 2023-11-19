@@ -1,24 +1,39 @@
+import json
 import os
 import re
 import sys
 from time import sleep
 import openai
 
-from assistant.env import logger
+from assistant.environment import env, logger
+
+def add_assistant_parsers(subparser):
+    list_parser = subparser.add_parser('list', help='list assistants')
+    list_parser.add_argument('-L', '--long', action='store_true', help='long format')
+    list_parser.add_argument('-S', '--separator', default=' ', help='output field separator')
+    create_parser = subparser.add_parser('create', help='create assistants')
+    create_parser.add_argument('-f', '--file_ids', help='file ids (comma separated)')
+    create_parser.add_argument('-i', '--instruction', help='instructions')
+    create_parser.add_argument('-n', '--name', help='name')
+    query_parser = subparser.add_parser('query', help='ask assistants')
+    query_parser.add_argument('id', default=None, help='assistant id')
+    query_parser.add_argument('-q', '--query', default=None, help='query string')
+    return subparser
 
 def list_assistants(args):
     separator = args.separator
     long = args.long
+
     assistants = openai.beta.assistants.list()
     logger.debug(assistants)
     for assistant_data in assistants.data:
-        id = assistant_data.id
-        name = assistant_data.name if assistant_data.name else ''
-        model = assistant_data.model if assistant_data.model else ''
-        instructions = re.sub(r'\s', '_', assistant_data.instructions if assistant_data.instructions else '')
+        id = assistant_data.id if assistant_data.id else 'None'
+        name = assistant_data.name if assistant_data.name else 'None'
+        model = assistant_data.model if assistant_data.model else 'None'
+        instructions = re.sub(r'\s', '_', assistant_data.instructions if assistant_data.instructions else 'None')
         if len(instructions) > 10:
             instructions = instructions[0:8] + '..'
-        tools = ';'.join([tool.type for tool in assistant_data.tools]) if assistant_data.tools else ''
+        tools = ';'.join([tool.type for tool in assistant_data.tools]) if assistant_data.tools else 'None'
         if long:
             print(separator.join([id, model, tools, name, instructions]))
         else:
@@ -27,33 +42,33 @@ def list_assistants(args):
 def create_assistant(args):
     name = args.name
     instructions = args.instruction
-    filepaths = args.file
-
-    files = []
-    for filepath in filepaths:
-        file = openai.files.create(file=open(filepath, 'rb'), purpose='assistants')
-        logger.debug(f'### Create file object: {file}')
-        files.append(file)
+    if args.file_ids:
+        file_ids = args.file_ids.split(',')
+    else:
+        file_ids = []
 
     assistant = openai.beta.assistants.create(
         name=name,
-        instructions=instructions if instructions is not None else '''あなたは政府の官僚です。以下のルールにしたがって質問に回答してください。
-
-### ルール
-
-・アップロードされたファイルにしたがって回答する
-''',
-        model = os.environ.get('OPENAI_MODEL_NAME'),
+        instructions=instructions if instructions is not None else 'You are a professional assistant.',
+        model = env.get('OPENAI_MODEL_NAME'),
         tools=[{'type': 'retrieval'}],
-        file_ids = [f.id for f in files]
+        file_ids=file_ids
     )
     logger.debug(f'Create assistant object: {assistant}')
 
-    return assistant.id
+    env.save_strings('assistant', [assistant.id])
+
+    print(assistant.id)
 
 def query_assistant(args):
-    assistant_id = args.id
-    query = args.query if args.query else sys.stdin.read()
+    if args.query:
+        query = args.query
+    else:
+        query = sys.stdin.read()
+    if args.id:
+        assistant_id = args.id
+    else:
+        assistant_id = env.load_strings('assistant')[0]
 
     assistant = openai.beta.assistants.retrieve(assistant_id=assistant_id)
     logger.debug(f'Retrieve assistant object: {assistant}')
