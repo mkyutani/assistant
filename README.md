@@ -1,2 +1,3 @@
-# taskagent
-Task agent using Large Language Model (LLM)
+# assistant
+
+Your assistant powered by OpenAI Assistants APIs.
