@@ -13,6 +13,7 @@ def add_file_parsers(subparser):
     list_parser.add_argument('-S', '--separator', default=' ', help='output field separator')
     create_parser = subparser.add_parser('create', help='create file')
     create_parser.add_argument('file', nargs='*', help='file path')
+    create_parser.add_argument('-S', '--separator', default=' ', help='output field separator')
     return subparser
 
 def list_files(args):
@@ -36,8 +37,11 @@ def list_files(args):
 def create_file(args):
     filepaths = args.file
     purpose = 'assistants'
+    separator = args.separator
 
     for filepath in filepaths:
         with open(filepath, 'rb') as fd:
             file = openai.files.create(file=fd, purpose=purpose)
             logger.debug(f'Create file: {file}')
+
+        print(separator.join([file.id, file.filename]))

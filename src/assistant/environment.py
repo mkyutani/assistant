@@ -39,6 +39,7 @@ class Env:
             with open(f'{self._data_dir}/{property}', 'r') as fd:
                 values = fd.readlines()
             values = [v.strip() for v in values]
+            values = [v for v in values if len(v) > 0]
             return values
         except Exception as e:
             return None

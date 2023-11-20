@@ -13,9 +13,10 @@ def add_assistant_parsers(subparser):
     create_parser.add_argument('-f', '--file_ids', help='file ids (comma separated)')
     create_parser.add_argument('-i', '--instruction', help='instructions')
     create_parser.add_argument('-n', '--name', help='name')
+    create_parser.add_argument('-S', '--separator', default=' ', help='output field separator')
     talk_parser = subparser.add_parser('talk', help='conversation with assistants')
-    talk_parser.add_argument('id', nargs='?', help='assistant id')
-    talk_parser.add_argument('-m', '--message', default=None, help='message to assistant')
+    talk_parser.add_argument('message', nargs='?', help='message to assistant')
+    talk_parser.add_argument('-a', '--assistant_id', help='assistant id')
     talk_parser.add_argument('-R', '--restart', action='store_true', help='restart conversation')
     return subparser
 
@@ -36,11 +37,12 @@ def list_assistants(args):
         if long:
             print(separator.join([id, model, tools, name, instructions]))
         else:
-            print(separator.join([id, model, name]))
+            print(separator.join([id, name]))
 
 def create_assistant(args):
     name = args.name
     instructions = args.instruction
+    separator = args.separator
     if args.file_ids:
         file_ids = args.file_ids.split(',')
     else:
@@ -57,7 +59,7 @@ def create_assistant(args):
 
     env.save_strings('assistant', [assistant.id])
 
-    print(assistant.id)
+    print(separator.join([assistant.id, assistant.name]))
 
 def talk_assistant(args):
     restarted = args.restart
@@ -69,8 +71,8 @@ def talk_assistant(args):
     assistant_id = None
     thread_id = None
     latest_assistant_info = env.load_strings('assistant')
-    if args.id:
-        assistant_id = args.id
+    if args.assistant_id:
+        assistant_id = args.assistant_id
     elif latest_assistant_info is not None and len(latest_assistant_info) > 0:
         assistant_id = latest_assistant_info[0]
         if (not restarted) and len(latest_assistant_info) > 1:
@@ -114,11 +116,16 @@ def talk_assistant(args):
         thread_messages = openai.beta.threads.messages.list(thread_id)
         logger.debug(f'List thread messages: {thread_messages}')
 
-        data_index = 1
-        for data in reversed(thread_messages.data):
-            answer = data.content[0].text.value
-            role = data.role
-            annotations = data.content[0].text.annotations
+        new_message = False
+        for message_index, thread_message in enumerate(reversed(thread_messages.data), start=1):
+            if not new_message:
+                if message.id == thread_message.id:
+                    new_message = True
+                continue
+
+            answer = thread_message.content[0].text.value
+            role = thread_message.role
+            annotations = thread_message.content[0].text.annotations
             footnotes = []
             note_index = 1
             for annotation in annotations:
@@ -129,7 +136,7 @@ def talk_assistant(args):
                 answer = answer.replace(annotation.text, note_mark)
                 note_index = note_index + 1
 
-            message_string = f'#{data_index}:{role}: {answer}'
+            message_string = f'#{message_index}:{role}: {answer}'
             footnotes_string = '\n'.join(footnotes)
 
             logger.debug(message_string)
@@ -137,5 +144,3 @@ def talk_assistant(args):
             if len(footnotes_string) > 0:
                 logger.debug(footnotes_string)
                 print('----\n' + footnotes_string)
-
-            data_index = data_index + 1
