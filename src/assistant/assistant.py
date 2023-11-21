@@ -9,6 +9,9 @@ def add_assistant_parsers(subparser):
     list_parser = subparser.add_parser('list', help='list assistants')
     list_parser.add_argument('-L', '--long', action='store_true', help='long format')
     list_parser.add_argument('-S', '--separator', default=' ', help='output field separator')
+    select_parser = subparser.add_parser('select', help='select assistants')
+    select_parser.add_argument('pattern', help='search pattern of assistants id or name')
+    select_parser.add_argument('-S', '--separator', default=' ', help='output field separator')
     create_parser = subparser.add_parser('create', help='create assistants')
     create_parser.add_argument('-f', '--file_ids', help='file ids (comma separated)')
     create_parser.add_argument('-i', '--instruction', help='instructions')
@@ -38,6 +41,24 @@ def list_assistants(args):
             print(separator.join([id, model, tools, name, instructions]))
         else:
             print(separator.join([id, name]))
+
+def select_assistants(args):
+    pattern = args.pattern
+    separator = args.separator
+
+    assistants = openai.beta.assistants.list()
+    logger.debug(assistants)
+    matched_assistants = [a for a in assistants.data if re.search(pattern, f'{a.id}\r{a.name}')]
+    if len(matched_assistants) > 1:
+        print(f'Ambiguous id or name pattern is given', file=sys.stderr)
+        for assistant in matched_assistants:
+            print(separator.join([assistant.id, assistant.name]))
+    elif len(matched_assistants) == 1:
+        assistant = matched_assistants[0]
+        env.save_strings('assistant', [assistant.id])
+        print(separator.join([assistant.id, assistant.name]))
+    else:
+        print(f'Not matched with any assistant ids or names', file=sys.stderr)
 
 def create_assistant(args):
     name = args.name
@@ -101,7 +122,7 @@ def talk_assistant(args):
     logger.debug(f'Create run: {run}')
 
     status = 'in_progress'
-    while status == 'in_progress':
+    while status in ['queued', 'in_progress', 'requires_action', 'cancelling']:
         sleep(10)
         result = openai.beta.threads.runs.retrieve(
             thread_id=thread_id,
@@ -110,8 +131,12 @@ def talk_assistant(args):
         logger.debug(f'Retrieve run: {result}')
         status = result.status
 
-    if status != 'completed':
-        logger.error(f'Failed to retrieve, status={status}')
+    if status == 'cancelled':
+        print('Cancelled by user', file=sys.stderr)
+    elif status == 'failed':
+        print(f'Failed: {result.last_error.code}: {result.last_error.message}', file=sys.stderr)
+    elif status == 'expired':
+        logger.error('Expired; Try again later')
     else:
         thread_messages = openai.beta.threads.messages.list(thread_id)
         logger.debug(f'List thread messages: {thread_messages}')
