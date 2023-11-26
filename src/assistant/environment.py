@@ -54,6 +54,12 @@ class Env:
     def _set_memory(self, name, value):
         self._memory[name] = value
 
+    def _remove_memory(self, name):
+        try:
+            del self._memory[name]
+        except KeyError as e:
+            pass
+
     def get(self, name):
         return os.environ.get(name)
 
@@ -71,6 +77,13 @@ class Env:
             properties = [properties]
         for name, value in properties:
             self._set_memory(name, value)
+        self._save_memory()
+
+    def remove(self, names: str | list):
+        if type(names) is str:
+            names = [names]
+        for name in names:
+            self._remove_memory(name)
         self._save_memory()
 
 env = Env()

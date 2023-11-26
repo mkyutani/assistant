@@ -8,11 +8,12 @@ from assistant.environment import env, logger
 def add_conversation_parsers(subparser):
     restart_parser = subparser.add_parser('restart', help='restart conversation')
     retrieve_parser = subparser.add_parser('retrieve', help='retrieve conversation')
-    select_parser = subparser.add_parser('select', help='select assistants')
+    select_parser = subparser.add_parser('select', help='select assistant')
     select_parser.add_argument('pattern', help='search pattern of assistants id or name')
     talk_parser = subparser.add_parser('talk', help='conversation with assistant')
     talk_parser.add_argument('message', nargs='?', help='message to assistant')
     talk_parser.add_argument('-a', '--assistant', help='assistant id or name')
+    unselect_parser = subparser.add_parser('unselect', help='unselect assistant')
     return subparser
 
 def _restart_assistant():
@@ -40,6 +41,9 @@ def select(args):
     else:
         env.store(('assistant', assistant.id))
         print(separator.join([assistant.id, assistant.name]))
+
+def unselect(args):
+    env.remove('assistant')
 
 def _print_thread_messages(thread_id, start_message_id=None):
     thread_messages = openai.beta.threads.messages.list(thread_id)
@@ -106,7 +110,7 @@ def talk(args):
     else:
         assistant_id = env.retrieve('assistant')
         if assistant_id is None:
-            print('Assistant is necessary', file=sys.stderr)
+            print('No assistant is assigned', file=sys.stderr)
             return
 
     thread_id = env.retrieve('thread')

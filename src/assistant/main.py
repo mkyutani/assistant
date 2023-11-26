@@ -3,7 +3,7 @@ import io
 import sys
 
 from assistant.assistant import add_assistant_parsers, create_assistant, list_assistants
-from assistant.conversation import add_conversation_parsers, restart, retrieve, select, talk
+from assistant.conversation import add_conversation_parsers, restart, retrieve, select, talk, unselect
 from assistant.file import add_file_parsers, create_file, list_files
 
 command_functions = {
@@ -18,7 +18,8 @@ command_functions = {
     'restart': restart,
     'retrieve': retrieve,
     'select': select,
-    'talk': talk
+    'talk': talk,
+    'unselect': unselect
 }
 
 def set_io_buffers():
