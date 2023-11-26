@@ -2,6 +2,7 @@ from time import sleep
 import openai
 
 from assistant.environment import env, logger
+from assistant.util import get_all_files
 
 def add_file_parsers(subparser):
     list_parser = subparser.add_parser('list', help='list files')
@@ -16,9 +17,8 @@ def list_files(args):
     long = args.long
     purpose = 'assistants'
 
-    files = openai.files.list(purpose=purpose)
-    files_str = ','.join([f.id for f in files])
-    logger.debug(f'List files: {files_str}')
+    files = get_all_files(purpose=purpose)
+    logger.debug('List files: ' + ','.join([f.id for f in files]))
     for file_data in files.data:
         id = file_data.id if file_data.id else 'None'
         filename = file_data.filename if file_data.filename else 'None'

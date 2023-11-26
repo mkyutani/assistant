@@ -1,11 +1,13 @@
 import re
+import sys
 import openai
 
 from assistant.environment import env, logger
+from assistant.util import get_file_ids_from_names
 
 def add_assistant_parsers(subparser):
     create_parser = subparser.add_parser('create', help='create assistants')
-    create_parser.add_argument('-f', '--file_ids', help='file ids (comma separated)')
+    create_parser.add_argument('-f', '--files', nargs='*', help='file names')
     create_parser.add_argument('-i', '--instruction', help='instructions')
     create_parser.add_argument('-n', '--name', help='name')
     list_parser = subparser.add_parser('list', help='list assistants')
@@ -34,12 +36,20 @@ def list_assistants(args):
 
 def create_assistant(args):
     name = args.name
+    filenames = args.files
     instructions = args.instruction
+    file_purpose = 'assistants'
     separator = ' '
-    if args.file_ids:
-        file_ids = args.file_ids.split(',')
+
+    if len(filenames) > 0:
+        (file_ids, all_matched) = get_file_ids_from_names(filenames, purpose=file_purpose)
+        if all_matched is False:
+            for id, name in zip(file_ids, filenames):
+                if id is None:
+                    print(f'No file matched with {name}', file=sys.stderr)
+            return
     else:
-        file_ids = []
+        file_ids = openai._types.NotGiven
 
     assistant = openai.beta.assistants.create(
         name=name,
