@@ -34,7 +34,7 @@ def _list_assistants():
     logger.debug(f'List assistants: {assistants}')
     return assistants
 
-def _select_assistant_by_chat_completions(auto_select_message):
+def _select_assistant_name_by_chat_completions(auto_select_message):
     response = openai.chat.completions.create(
         model = env.get('OPENAI_MODEL_NAME'),
         messages = [
@@ -44,24 +44,22 @@ def _select_assistant_by_chat_completions(auto_select_message):
     logger.debug(f'Auto select: {response}')
 
     try:
-        selected = response.choices[0].message.content
+        selected_assistant_name = response.choices[0].message.content
     except Exception:
-        selected = None
+        selected_assistant_name = None
 
-    print(selected)
-
-    return selected
+    return selected_assistant_name
 
 def _auto_select_assistant(user_message):
     assistants = _list_assistants()
     itemized_assistant_names = '\n'.join(['- ' + ad.name for ad in assistants.data if ad.name])
     auto_select_message = auto_select_message_template.format(user_message=user_message, itemized_assistant_names=itemized_assistant_names)
-    selected_name = _select_assistant_by_chat_completions(auto_select_message)
+    selected_name = _select_assistant_name_by_chat_completions(auto_select_message)
     for assistant_data in assistants.data:
         if selected_name == assistant_data.name:
-            return assistant_data.id
+            return (assistant_data.id, assistant_data.name)
     else:
-        return None
+        return (None, None)
 
 def _select_assistant(pattern):
     all_assistants = openai.beta.assistants.list()
@@ -168,12 +166,12 @@ def talk(args):
     else:
         assistant_id = env.retrieve('assistant')
         if assistant_id is None:
-            assistant_id = _auto_select_assistant(message)
+            (assistant_id, assistant_name) = _auto_select_assistant(message)
             if assistant_id is None:
                 print('No assistant is assigned automatically', file=sys.stderr)
                 return
             env.store(('assistant', assistant_id))
-            print(f'Assistant {assistant_id} is assigned', file=sys.stderr)
+            print(f'Assistant {assistant_name} is assigned', file=sys.stderr)
 
     thread_id = env.retrieve('thread')
     if thread_id is None:
