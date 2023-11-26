@@ -7,6 +7,7 @@ from assistant.environment import env, logger
 def add_conversation_parsers(subparser):
     restart_parser = subparser.add_parser('restart', help='restart conversation')
     retrieve_parser = subparser.add_parser('retrieve', help='retrieve conversation')
+    retrieve_parser.add_argument('-f', '--footnotes', action='store_true', help='print footnotes')
     select_parser = subparser.add_parser('select', help='select assistant')
     select_parser.add_argument('pattern', help='search pattern of assistants id or name')
     talk_parser = subparser.add_parser('talk', help='conversation with assistant')
@@ -95,7 +96,7 @@ def restart(args):
     _restart_assistant()
     _unselect_assistant()
 
-def _print_thread_messages(thread_id, start_message_id=None):
+def _print_thread_messages(thread_id, start_message_id=None, print_footnotes=True):
     thread_messages = openai.beta.threads.messages.list(thread_id)
     logger.debug(f'List thread messages: {thread_messages}')
 
@@ -104,6 +105,7 @@ def _print_thread_messages(thread_id, start_message_id=None):
     else:
         message_to_print = False
 
+    message_separator = None
     for message_index, thread_message in enumerate(reversed(thread_messages.data), start=1):
         if message_to_print is False:
             if thread_message.id == start_message_id:
@@ -115,8 +117,7 @@ def _print_thread_messages(thread_id, start_message_id=None):
         role = thread_message.role
         annotations = thread_message.content[0].text.annotations
         footnotes = []
-        note_index = 1
-        for annotation in annotations:
+        for note_index, annotation in enumerate(annotations, start=1):
             note_mark = f'[{note_index}]'
             file_id = annotation.file_citation.file_id
             if file_id is None or len(file_id) == 0:
@@ -127,23 +128,29 @@ def _print_thread_messages(thread_id, start_message_id=None):
             footnotes.append(f'{note_mark} In {filename}.\n{quote}')
             if annotation.text is not None and len(annotation.text) > 0:
                 answer = answer.replace(annotation.text, note_mark)
-            note_index = note_index + 1
 
         message_string = f'#{message_index}:{role}: {answer}'
         footnotes_string = '\n'.join(footnotes)
 
-        logger.debug('Message: ' + re.sub(r'\s', '_', message_string))
+        if message_separator:
+            print(message_separator)
+        else:
+            message_separator = '-' * 80
         print(message_string)
+        logger.debug('Message: ' + re.sub(r'\s', '_', message_string))
         if len(footnotes_string) > 0:
-            logger.debug('Footnotes: ' + re.sub(r'\s', '_', footnotes_string))
-            print('----\n' + footnotes_string)
+            if print_footnotes is True:
+                print('-' * 8 + '\n' + footnotes_string)
+                logger.debug('Footnotes: ' + re.sub(r'\s', '_', footnotes_string)[:80])
 
 def retrieve(args):
+    print_footnotes = args.footnotes
+
     thread_id = env.retrieve('thread')
     if thread_id is None:
         print('No conversation history', file=sys.stderr)
     else:
-        _print_thread_messages(thread_id)
+        _print_thread_messages(thread_id, print_footnotes=print_footnotes)
 
 def talk(args):
     if args.message:
@@ -203,4 +210,4 @@ def talk(args):
     elif status == 'expired':
         print('Expired: Try again later', file=sys.stderr)
     else:
-        _print_thread_messages(thread_id, start_message_id=message.id)
+        _print_thread_messages(thread_id, start_message_id=message.id, print_footnotes=False)
