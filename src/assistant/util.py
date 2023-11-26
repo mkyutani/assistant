@@ -21,3 +21,19 @@ def get_file_ids_from_names(filenames, purpose=openai._types.NotGiven):
     logger.debug(f'Get file IDs from names: {file_ids}; {all_matched}; {filenames}')
     return (file_ids, all_matched)
 
+def get_all_assistants():
+    assistants = openai.beta.assistants.list()
+    logger.debug(f'Get all assistants: {assistants}')
+    return assistants
+
+def get_assistant_ids_from_names(assistant_names, strict=False):
+    assistants = get_all_assistants()
+    assistant_ids = []
+    for assistant_name in assistant_names:
+        matched_ids = []
+        for assistant_data in assistants.data:
+            if (strict and assistant_name == assistant_data.name) or (not strict and assistant_name in assistant_data.name) or (assistant_name == assistant_data.id):
+                matched_ids.append(assistant_data.id)
+        assistant_ids.append(matched_ids)
+    logger.debug(f'Get assistant IDs from names: {assistant_ids}; {assistant_names}')
+    return assistant_ids

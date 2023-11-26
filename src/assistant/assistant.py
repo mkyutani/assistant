@@ -3,9 +3,12 @@ import sys
 import openai
 
 from assistant.environment import env, logger
-from assistant.util import get_file_ids_from_names
+from assistant.util import get_all_assistants, get_assistant_ids_from_names, get_file_ids_from_names
 
 def add_assistant_parsers(subparser):
+    delete_parser = subparser.add_parser('delete', help='delete assistants')
+    delete_parser.add_argument('name', help='assistant name')
+    delete_parser.add_argument('-s', '--strict', action='store_true', help='match name strictly')
     create_parser = subparser.add_parser('create', help='create assistants')
     create_parser.add_argument('-f', '--files', nargs='*', help='file names')
     create_parser.add_argument('-i', '--instruction', help='instructions')
@@ -19,15 +22,14 @@ def list_assistants(args):
     separator = args.separator
     long = args.long
 
-    assistants = openai.beta.assistants.list()
-    logger.debug(f'List assistants: {assistants}')
+    assistants = get_all_assistants()
     for assistant_data in assistants.data:
         id = assistant_data.id if assistant_data.id else 'None'
         name = assistant_data.name if assistant_data.name else 'None'
         model = assistant_data.model if assistant_data.model else 'None'
         instructions = re.sub(r'\s', '_', assistant_data.instructions if assistant_data.instructions else 'None')
-        if len(instructions) > 10:
-            instructions = instructions[0:8] + '..'
+        if len(instructions) > 40:
+            instructions = instructions[0:38] + '..'
         tools = ';'.join([tool.type for tool in assistant_data.tools]) if assistant_data.tools else 'None'
         if long:
             print(separator.join([id, model, tools, name, instructions]))
@@ -46,7 +48,7 @@ def create_assistant(args):
         if all_matched is False:
             for id, name in zip(file_ids, filenames):
                 if id is None:
-                    print(f'No file matched with {name}', file=sys.stderr)
+                    print(f'No files matched with {name}', file=sys.stderr)
             return
     else:
         file_ids = openai._types.NotGiven
@@ -63,3 +65,17 @@ def create_assistant(args):
     env.store(('assistant', assistant.id))
 
     print(separator.join([assistant.id, assistant.name]))
+
+def delete_assistant(args):
+    name = args.name
+    strict = args.strict
+
+    matched_ids = get_assistant_ids_from_names([name], strict=strict)[0]
+    if len(matched_ids) > 1:
+        print(f'Ambiguous name: {name}', file=sys.stderr)
+    elif len(matched_ids) == 0:
+        print(f'No assistants matched with {name}', file=sys.stderr)
+    else:
+        id = matched_ids[0]
+        deleted = openai.beta.assistants.delete(id)
+        logger.debug(f'Delete assistant: {deleted}')

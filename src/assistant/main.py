@@ -2,13 +2,14 @@ import argparse
 import io
 import sys
 
-from assistant.assistant import add_assistant_parsers, create_assistant, list_assistants
+from assistant.assistant import add_assistant_parsers, create_assistant, delete_assistant, list_assistants
 from assistant.conversation import add_conversation_parsers, restart, retrieve, select, talk, unselect
 from assistant.file import add_file_parsers, create_file, list_files
 
 command_functions = {
     'assistant': {
         'create': create_assistant,
+        'delete': delete_assistant,
         'list': list_assistants
     },
     'file': {
