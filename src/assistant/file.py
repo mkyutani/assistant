@@ -1,7 +1,3 @@
-import json
-import os
-import re
-import sys
 from time import sleep
 import openai
 

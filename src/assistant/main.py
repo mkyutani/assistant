@@ -1,24 +1,24 @@
 import argparse
 import io
-import os
 import sys
-from time import sleep
-from dotenv import load_dotenv
 
-from assistant.assistant import add_assistant_parsers, create_assistant, list_assistants, restart_assistant, retrieve_assistant, select_assistant, talk_assistant
+from assistant.assistant import add_assistant_parsers, create_assistant, list_assistants
+from assistant.conversation import add_conversation_parsers, restart, retrieve, select, talk
 from assistant.file import add_file_parsers, create_file, list_files
 
 command_functions = {
-    'list': list_assistants,
-    'select': select_assistant,
-    'create': create_assistant,
-    'restart': restart_assistant,
-    'retrieve': retrieve_assistant,
-    'talk': talk_assistant,
+    'assistant': {
+        'create': create_assistant,
+        'list': list_assistants
+    },
     'file': {
-        'list': list_files,
-        'create': create_file
-    }
+        'create': create_file,
+        'list': list_files
+    },
+    'restart': restart,
+    'retrieve': retrieve,
+    'select': select,
+    'talk': talk
 }
 
 def set_io_buffers():
@@ -29,13 +29,17 @@ def set_io_buffers():
 def main():
     set_io_buffers()
 
-    parser = argparse.ArgumentParser(description='assistant')
-    command_subparser = parser.add_subparsers(dest='command', title='command', required=True)
-    command_subparser = add_assistant_parsers(command_subparser)
+    parser = argparse.ArgumentParser(description='conversation')
+    conversation_subparser = parser.add_subparsers(dest='command', title='conversation command', required=True)
+    add_conversation_parsers(conversation_subparser)
 
-    file_parser = command_subparser.add_parser('file', help='file command')
+    assistant_parser = conversation_subparser.add_parser('assistant', help='assistant command')
+    assistant_subparser = assistant_parser.add_subparsers(dest='subcommand', title='assistant subcommand', required=True)
+    add_assistant_parsers(assistant_subparser)
+
+    file_parser = conversation_subparser.add_parser('file', help='file command')
     file_subparser = file_parser.add_subparsers(dest='subcommand', title='file subcommand', required=True)
-    file_subparser = add_file_parsers(file_subparser)
+    add_file_parsers(file_subparser)
 
     args = parser.parse_args()
 
