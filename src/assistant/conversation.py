@@ -34,7 +34,6 @@ def _list_assistants():
     return assistants
 
 def _select_assistant_by_chat_completions(auto_select_message):
-    print(auto_select_message)
     response = openai.chat.completions.create(
         model = env.get('OPENAI_MODEL_NAME'),
         messages = [
