@@ -121,7 +121,7 @@ def _print_thread_messages(thread_id, start_message_id=None, print_footnotes=Tru
             note_mark = f'[{note_index}]'
             file_id = annotation.file_citation.file_id
             if file_id is None or len(file_id) == 0:
-                filename = 'missing-file-name'
+                filename = 'missing'
             else:
                 filename = openai.files.retrieve(file_id).filename
             quote = annotation.file_citation.quote
