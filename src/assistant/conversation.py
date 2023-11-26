@@ -2,7 +2,6 @@ import re
 import sys
 from time import sleep
 import openai
-
 from assistant.environment import env, logger
 
 def add_conversation_parsers(subparser):
@@ -16,15 +15,53 @@ def add_conversation_parsers(subparser):
     unselect_parser = subparser.add_parser('unselect', help='unselect assistant')
     return subparser
 
-def _restart_assistant():
-    thread = openai.beta.threads.create()
-    logger.debug(f'Create thread: {thread}')
-    if thread:
-        env.store(('thread', thread.id))
-    return thread
+auto_select_message_template = '''
+Which assistant best answers the following question?
 
-def restart(args):
-    _restart_assistant()
+### Question
+{user_message}
+
+### Rules
+- Answer the assistant name simply
+
+### Assistant candidates
+{itemized_assistant_names}
+'''
+
+def _list_assistants():
+    assistants = openai.beta.assistants.list()
+    logger.debug(f'List assistants: {assistants}')
+    return assistants
+
+def _select_assistant_by_chat_completions(auto_select_message):
+    print(auto_select_message)
+    response = openai.chat.completions.create(
+        model = env.get('OPENAI_MODEL_NAME'),
+        messages = [
+            { 'role': 'user', 'content': auto_select_message }
+        ]
+    )
+    logger.debug(f'Auto select: {response}')
+
+    try:
+        selected = response.choices[0].message.content
+    except Exception:
+        selected = None
+
+    print(selected)
+
+    return selected
+
+def _auto_select_assistant(user_message):
+    assistants = _list_assistants()
+    itemized_assistant_names = '\n'.join(['- ' + ad.name for ad in assistants.data if ad.name])
+    auto_select_message = auto_select_message_template.format(user_message=user_message, itemized_assistant_names=itemized_assistant_names)
+    selected_name = _select_assistant_by_chat_completions(auto_select_message)
+    for assistant_data in assistants.data:
+        if selected_name == assistant_data.name:
+            return assistant_data.id
+    else:
+        return None
 
 def _select_assistant(pattern):
     all_assistants = openai.beta.assistants.list()
@@ -42,8 +79,22 @@ def select(args):
         env.store(('assistant', assistant.id))
         print(separator.join([assistant.id, assistant.name]))
 
-def unselect(args):
+def _unselect_assistant():
     env.remove('assistant')
+
+def unselect(args):
+    _unselect_assistant()
+
+def _restart_assistant():
+    thread = openai.beta.threads.create()
+    logger.debug(f'Create thread: {thread}')
+    if thread:
+        env.store(('thread', thread.id))
+    return thread
+
+def restart(args):
+    _restart_assistant()
+    _unselect_assistant()
 
 def _print_thread_messages(thread_id, start_message_id=None):
     thread_messages = openai.beta.threads.messages.list(thread_id)
@@ -75,7 +126,8 @@ def _print_thread_messages(thread_id, start_message_id=None):
                 filename = openai.files.retrieve(file_id).filename
             quote = annotation.file_citation.quote
             footnotes.append(f'{note_mark} In {filename}.\n{quote}')
-            answer = answer.replace(annotation.text, note_mark)
+            if annotation.text is not None and len(annotation.text) > 0:
+                answer = answer.replace(annotation.text, note_mark)
             note_index = note_index + 1
 
         message_string = f'#{message_index}:{role}: {answer}'
@@ -110,8 +162,12 @@ def talk(args):
     else:
         assistant_id = env.retrieve('assistant')
         if assistant_id is None:
-            print('No assistant is assigned', file=sys.stderr)
-            return
+            assistant_id = _auto_select_assistant(message)
+            if assistant_id is None:
+                print('No assistant is assigned automatically', file=sys.stderr)
+                return
+            env.store(('assistant', assistant_id))
+            print(f'Assistant {assistant_id} is assigned', file=sys.stderr)
 
     thread_id = env.retrieve('thread')
     if thread_id is None:

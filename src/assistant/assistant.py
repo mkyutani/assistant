@@ -18,7 +18,7 @@ def list_assistants(args):
     long = args.long
 
     assistants = openai.beta.assistants.list()
-    logger.debug(assistants)
+    logger.debug(f'List assistants: {assistants}')
     for assistant_data in assistants.data:
         id = assistant_data.id if assistant_data.id else 'None'
         name = assistant_data.name if assistant_data.name else 'None'
