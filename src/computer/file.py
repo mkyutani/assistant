@@ -1,8 +1,8 @@
 from time import sleep
 import openai
 
-from assistant.environment import env, logger
-from assistant.util import get_all_files
+from computer.environment import env, logger
+from computer.util import get_all_files
 
 def add_file_parsers(subparser):
     list_parser = subparser.add_parser('list', help='list files')

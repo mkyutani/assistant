@@ -1,5 +1,5 @@
 import openai
-from assistant.environment import logger
+from computer.environment import logger
 
 def get_all_files(purpose=openai._types.NotGiven):
     files = openai.files.list(purpose=purpose)

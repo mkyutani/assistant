@@ -2,8 +2,8 @@ import re
 import sys
 import openai
 
-from assistant.environment import env, logger
-from assistant.util import get_all_assistants, get_assistant_ids_from_names, get_file_ids_from_names
+from computer.environment import env, logger
+from computer.util import get_all_assistants, get_assistant_ids_from_names, get_file_ids_from_names
 
 def add_assistant_parsers(subparser):
     delete_parser = subparser.add_parser('delete', help='delete assistants')

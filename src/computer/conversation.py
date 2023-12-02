@@ -2,7 +2,7 @@ import re
 import sys
 from time import sleep
 import openai
-from assistant.environment import env, logger
+from computer.environment import env, logger
 
 def add_conversation_parsers(subparser):
     restart_parser = subparser.add_parser('restart', help='restart conversation')
