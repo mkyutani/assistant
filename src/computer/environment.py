@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-from dotenv import load_dotenv
 from loguru import logger as loguru_logger
 
 class Env:
@@ -9,8 +8,6 @@ class Env:
     def __new__(cls, *args, **kargs):
         if not hasattr(cls, '_instance'):
             cls._instance = super(Env, cls).__new__(cls)
-
-            load_dotenv()
 
             cls._logger = loguru_logger
             cls._logger.remove()
@@ -63,6 +60,9 @@ class Env:
     def get(self, name):
         return os.environ.get(name)
 
+    def set(self, name, value):
+        os.environ[name] = value
+
     def logger(self):
         return self._logger
 
@@ -72,18 +72,12 @@ class Env:
     def retrieve(self, name):
         return self._get_memory(name)
 
-    def store(self, properties: tuple | list):
-        if type(properties) is tuple:
-            properties = [properties]
-        for name, value in properties:
-            self._set_memory(name, value)
+    def store(self, name, value):
+        self._set_memory(name, value)
         self._save_memory()
 
-    def remove(self, names: str | list):
-        if type(names) is str:
-            names = [names]
-        for name in names:
-            self._remove_memory(name)
+    def remove(self, name):
+        self._remove_memory(name)
         self._save_memory()
 
 env = Env()

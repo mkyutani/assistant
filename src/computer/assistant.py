@@ -6,17 +6,19 @@ from computer.environment import env, logger
 from computer.util import get_all_assistants, get_assistant_ids_from_names, get_file_ids_from_names
 
 def add_assistant_parsers(subparser):
-    delete_parser = subparser.add_parser('delete', help='delete assistants')
+    subcommand_parser = subparser.add_parser('assistant', help='assistant command')
+    subcommand_subparser = subcommand_parser.add_subparsers(dest='subcommand', title='assistant subcommand', required=True)
+    delete_parser = subcommand_subparser.add_parser('delete', help='delete assistants')
     delete_parser.add_argument('name', help='assistant name')
     delete_parser.add_argument('-s', '--strict', action='store_true', help='match name strictly')
-    create_parser = subparser.add_parser('create', help='create assistants')
+    create_parser = subcommand_subparser.add_parser('create', help='create assistants')
     create_parser.add_argument('-f', '--files', nargs='*', help='file names')
     create_parser.add_argument('-i', '--instruction', help='instructions')
     create_parser.add_argument('-n', '--name', help='name')
-    list_parser = subparser.add_parser('list', help='list assistants')
+    list_parser = subcommand_subparser.add_parser('list', help='list assistants')
     list_parser.add_argument('-L', '--long', action='store_true', help='long format')
     list_parser.add_argument('-S', '--separator', default=' ', help='output field separator')
-    return subparser
+    return subcommand_subparser
 
 def list_assistants(args):
     separator = args.separator

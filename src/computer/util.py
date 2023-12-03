@@ -1,5 +1,7 @@
+import re
+import sys
 import openai
-from computer.environment import logger
+from computer.environment import env, logger
 
 def get_all_files(purpose=openai._types.NotGiven):
     files = openai.files.list(purpose=purpose)

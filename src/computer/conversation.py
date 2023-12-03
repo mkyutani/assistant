@@ -3,6 +3,7 @@ import sys
 from time import sleep
 import openai
 from computer.environment import env, logger
+from computer.util import get_all_assistants
 
 def add_conversation_parsers(subparser):
     restart_parser = subparser.add_parser('restart', help='restart conversation')
@@ -13,26 +14,27 @@ def add_conversation_parsers(subparser):
     talk_parser = subparser.add_parser('talk', help='conversation with assistant')
     talk_parser.add_argument('message', nargs='?', help='message to assistant')
     talk_parser.add_argument('-a', '--assistant', help='assistant id or name')
+    talk_parser.add_argument('-m', '--model', help='model name')
     unselect_parser = subparser.add_parser('unselect', help='unselect assistant')
     return subparser
 
-auto_select_message_template = '''
+def _select_assistant_by_pattern(pattern):
+    assistants = get_all_assistants()
+    matched_assistants = [a for a in assistants.data if re.search(pattern, f'{a.id}\r{a.name}')]
+    return matched_assistants[0] if len(matched_assistants) == 1 else None
+
+_message_template = '''
 Which assistant best answers the following question?
 
 ### Question
-{user_message}
+{context}
 
 ### Rules
 - Answer the assistant name simply
 
 ### Assistant candidates
-{itemized_assistant_names}
+{itemized_assistant_descriptions}
 '''
-
-def _list_assistants():
-    assistants = openai.beta.assistants.list()
-    logger.debug(f'List assistants: {assistants}')
-    return assistants
 
 def _select_assistant_name_by_chat_completions(auto_select_message):
     response = openai.chat.completions.create(
@@ -50,51 +52,97 @@ def _select_assistant_name_by_chat_completions(auto_select_message):
 
     return selected_assistant_name
 
-def _auto_select_assistant(user_message):
-    assistants = _list_assistants()
-    itemized_assistant_names = '\n'.join(['- ' + ad.name for ad in assistants.data if ad.name])
-    auto_select_message = auto_select_message_template.format(user_message=user_message, itemized_assistant_names=itemized_assistant_names)
+def _select_assistant_by_context(context):
+    original_chat_name = 'Chat completion'
+    original_chat_instructions = 'Original ChatGPT chat completion'
+    assistants = get_all_assistants()
+    assistant_descriptions = [(a.name, a.instructions if a.instructions else '') for a in assistants.data if a.name]
+    assistant_descriptions.append((original_chat_name, original_chat_instructions))
+    itemized_assistant_descriptions = '\n'.join([f'- Name: {name}\n  Description: {description}' for (name, description) in assistant_descriptions])
+    auto_select_message = _message_template.format(context=context, itemized_assistant_descriptions=itemized_assistant_descriptions)
     selected_name = _select_assistant_name_by_chat_completions(auto_select_message)
     for assistant_data in assistants.data:
         if selected_name == assistant_data.name:
-            return (assistant_data.id, assistant_data.name)
+            return assistant_data
     else:
-        return (None, None)
+        return None
 
-def _select_assistant(pattern):
-    all_assistants = openai.beta.assistants.list()
-    matched_assistants = [a for a in all_assistants.data if re.search(pattern, f'{a.id}\r{a.name}')]
-    return matched_assistants[0] if len(matched_assistants) == 1 else None
+def _select_assistant(pattern, message=None):
+    assistant_profile = env.retrieve('assistant')
+    if pattern:
+        assistant = _select_assistant_by_pattern(pattern)
+        if not assistant:
+            print('Assistant id or name is ambiguous or not matched with any ones', file=sys.stderr)
+            assistant_profile = None
+            env.remove('assistant')
+        else:
+            print(f'Assistant {assistant.name} is assigned', file=sys.stderr)
+            assistant_profile = { 'id': assistant.id, 'name': assistant.name}
+            env.store('assistant', assistant_profile)
+    elif assistant_profile:
+        pass
+    elif message:
+        assistant = _select_assistant_by_context(message)
+        if assistant is None:
+            print('No assistant is assigned automatically', file=sys.stderr)
+            assistant_profile = None
+            env.remove('assistant')
+        else:
+            print(f'Assistant {assistant.name} is assigned', file=sys.stderr)
+            assistant_profile = { 'id': assistant.id, 'name': assistant.name}
+            env.store('assistant', assistant_profile)
+
+    return assistant_profile
+
+def _unselect_assistant():
+    env.remove('assistant')
+
+def _start_thread():
+    thread = openai.beta.threads.create()
+    logger.debug(f'Create thread: {thread}')
+    thread_profile = { 'type': 'thread', 'id': thread.id, 'messages': None }
+    env.store('thread', thread_profile)
+    print('New thread is created', file=sys.stderr)
+    return thread_profile
+
+def _start_chat_completion():
+    thread_profile = { 'type': 'chat-completion', 'id': None, 'messages': [] }
+    env.store('thread', thread_profile)
+    print('New chat completion is created', file=sys.stderr)
+    return thread_profile
+
+def _remove_thread():
+    env.remove('thread')
+
+def _select_thread_and_assistant(pattern, user_message):
+    thread_profile = env.retrieve('thread')
+    assistant_profile = env.retrieve('assistant')
+    if not thread_profile or (thread_profile['type'] == 'thread' and not assistant_profile):
+        assistant_profile = _select_assistant(pattern, user_message)
+        if assistant_profile:
+            thread_profile = _start_thread()
+        else:
+            thread_profile = _start_chat_completion()
 
 def select(args):
     pattern = args.pattern
     separator = ' '
 
-    assistant = _select_assistant(pattern)
-    if not assistant:
-        print('Id or name is not matched or ambiguous', file=sys.stderr)
+    assistant_profile = _select_assistant(pattern)
+    if not assistant_profile:
+        print('No assistant is selected', file=sys.stderr)
     else:
-        env.store(('assistant', assistant.id))
-        print(separator.join([assistant.id, assistant.name]))
-
-def _unselect_assistant():
-    env.remove('assistant')
+        print(separator.join([assistant_profile.id, assistant_profile.name]))
 
 def unselect(args):
     _unselect_assistant()
 
-def _restart_assistant():
-    thread = openai.beta.threads.create()
-    logger.debug(f'Create thread: {thread}')
-    if thread:
-        env.store(('thread', thread.id))
-    return thread
-
 def restart(args):
-    _restart_assistant()
+    _remove_thread()
     _unselect_assistant()
 
-def _print_thread_messages(thread_id, start_message_id=None, print_footnotes=True):
+def _print_thread_messages(thread_profile, start_message_id=None, print_footnotes=True):
+    thread_id = thread_profile['id']
     thread_messages = openai.beta.threads.messages.list(thread_id)
     logger.debug(f'List thread messages: {thread_messages}')
 
@@ -141,63 +189,20 @@ def _print_thread_messages(thread_id, start_message_id=None, print_footnotes=Tru
                 print('-' * 8 + '\n' + footnotes_string)
                 logger.debug('Footnotes: ' + re.sub(r'\s', '_', footnotes_string)[:80])
 
-def retrieve(args):
-    print_footnotes = args.footnotes
+def _talk_with_assistants(thread_profile, assistant_profile, user_message):
+    thread_id = thread_profile['id']
+    assistant_id = assistant_profile['id']
 
-    thread_id = env.retrieve('thread')
-    if thread_id is None:
-        print('No conversation history', file=sys.stderr)
-    else:
-        _print_thread_messages(thread_id, print_footnotes=print_footnotes)
-
-def talk(args):
-    if args.message:
-        message = args.message
-    else:
-        message = sys.stdin.read()
-
-    if args.assistant:
-        assistant = _select_assistant(args.assistant)
-        if assistant is None:
-            print('Id or name is not matched or ambiguous', file=sys.stderr)
-            return
-        assistant_id = assistant.id
-        env.store(('assistant', assistant_id))
-    else:
-        assistant_id = env.retrieve('assistant')
-        if assistant_id is None:
-            (assistant_id, assistant_name) = _auto_select_assistant(message)
-            if assistant_id is None:
-                print('No assistant is assigned automatically', file=sys.stderr)
-                return
-            env.store(('assistant', assistant_id))
-            print(f'Assistant {assistant_name} is assigned', file=sys.stderr)
-
-    thread_id = env.retrieve('thread')
-    if thread_id is None:
-        thread = _restart_assistant()
-        thread_id = thread.id
-
-    message = openai.beta.threads.messages.create(
-        thread_id=thread_id,
-        role="user",
-        content=message
-    )
+    message = openai.beta.threads.messages.create(thread_id=thread_id, role="user", content=user_message)
     logger.debug(f'Create message: {message}')
 
-    run = openai.beta.threads.runs.create(
-        thread_id=thread_id,
-        assistant_id=assistant_id
-    )
+    run = openai.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant_id)
     logger.debug(f'Create run: {run}')
 
     status = 'in_progress'
     while status in ['queued', 'in_progress', 'requires_action', 'cancelling']:
         sleep(10)
-        result = openai.beta.threads.runs.retrieve(
-            thread_id=thread_id,
-            run_id=run.id
-        )
+        result = openai.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
         logger.debug(f'Retrieve run: {result}')
         status = result.status
 
@@ -208,4 +213,67 @@ def talk(args):
     elif status == 'expired':
         print('Expired: Try again later', file=sys.stderr)
     else:
-        _print_thread_messages(thread_id, start_message_id=message.id, print_footnotes=False)
+        _print_thread_messages(thread_profile, start_message_id=message.id, print_footnotes=False)
+
+def _print_chat_completion_messages(thread_profile):
+    messages = thread_profile['messages']
+    message_separator = None
+    for message_index, message in enumerate(messages, start=1):
+        role = message['role']
+        content = message['content']
+        message_string = f'#{message_index}:{role}: {content}'
+
+        if message_separator:
+            print(message_separator)
+        else:
+            message_separator = '-' * 80
+        print(message_string)
+        logger.debug('Message: ' + re.sub(r'\s', '_', message_string))
+
+def _talk_by_chat_completion(thread_profile, user_message):
+        messages = thread_profile['messages']
+        messages.append({ 'role': 'user', 'content': user_message })
+        model = env.get('OPENAI_MODEL_NAME')
+        response = openai.chat.completions.create(model=model, messages=messages)
+        logger.debug(response)
+        response_message = response.choices[0].message.content
+        response_role = response.choices[0].message.role
+        messages.append({'role': response_role, 'content': response_message})
+        thread_profile['messages'] = messages
+        env.store('thread', thread_profile)
+        _print_chat_completion_messages(thread_profile)
+
+def retrieve(args):
+    print_footnotes = args.footnotes
+
+    thread_profile = env.retrieve('thread')
+    if thread_profile is None:
+        print('No conversation history', file=sys.stderr)
+    elif thread_profile['type'] == 'thread':
+        _print_thread_messages(thread_profile, print_footnotes=print_footnotes)
+    else:
+        if print_footnotes is True:
+            print('Ignore print_footnotes option because messages are created by chat completion', file=sys.stderr)
+        _print_chat_completion_messages(thread_profile)
+
+def talk(args):
+    if args.model:
+        env.set('OPENAI_MODEL_NAME', args.model)
+
+    if args.message:
+        user_message = args.message
+    else:
+        user_message = sys.stdin.read()
+
+    if args.assistant:
+        pattern = args.assistant
+    else:
+        pattern = None        
+
+    _select_thread_and_assistant(pattern, user_message)
+    thread_profile = env.retrieve('thread')
+    assistant_profile = env.retrieve('assistant')
+    if thread_profile['type'] == 'thread':
+        _talk_with_assistants(thread_profile, assistant_profile, user_message)
+    else:
+        _talk_by_chat_completion(thread_profile, user_message)

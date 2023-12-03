@@ -34,14 +34,8 @@ def main():
     parser = argparse.ArgumentParser(description='conversation')
     conversation_subparser = parser.add_subparsers(dest='command', title='conversation command', required=True)
     add_conversation_parsers(conversation_subparser)
-
-    assistant_parser = conversation_subparser.add_parser('assistant', help='assistant command')
-    assistant_subparser = assistant_parser.add_subparsers(dest='subcommand', title='assistant subcommand', required=True)
-    add_assistant_parsers(assistant_subparser)
-
-    file_parser = conversation_subparser.add_parser('file', help='file command')
-    file_subparser = file_parser.add_subparsers(dest='subcommand', title='file subcommand', required=True)
-    add_file_parsers(file_subparser)
+    add_assistant_parsers(conversation_subparser)
+    add_file_parsers(conversation_subparser)
 
     args = parser.parse_args()
 
