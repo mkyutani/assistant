@@ -3,6 +3,7 @@ import io
 import sys
 
 from computer.assistant import add_assistant_parsers, create_assistant, delete_assistant, list_assistants
+from computer.config import add_config_parsers, list_config, print_config, set_config, unset_config
 from computer.conversation import add_conversation_parsers, restart, retrieve, select, talk, unselect
 from computer.file import add_file_parsers, create_file, list_files
 
@@ -11,6 +12,12 @@ command_functions = {
         'create': create_assistant,
         'delete': delete_assistant,
         'list': list_assistants
+    },
+    'config': {
+        'list': list_config,
+        'print': print_config,
+        'set': set_config,
+        'unset': unset_config
     },
     'file': {
         'create': create_file,
@@ -36,6 +43,7 @@ def main():
     add_conversation_parsers(conversation_subparser)
     add_assistant_parsers(conversation_subparser)
     add_file_parsers(conversation_subparser)
+    add_config_parsers(conversation_subparser)
 
     args = parser.parse_args()
 
