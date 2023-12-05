@@ -4,7 +4,7 @@ import sys
 
 from computer.assistant import add_assistant_parsers, create_assistant, delete_assistant, list_assistants
 from computer.config import add_config_parsers, list_config, print_config, set_config, remove_config
-from computer.conversation import add_conversation_parsers, restart, retrieve, select, talk, unselect
+from computer.conversation import add_conversation_parsers, retrieve, select, talk, talk_next, unselect
 from computer.file import add_file_parsers, create_file, list_files
 
 command_functions = {
@@ -23,7 +23,7 @@ command_functions = {
         'create': create_file,
         'list': list_files
     },
-    'restart': restart,
+    'next': talk_next,
     'retrieve': retrieve,
     'select': select,
     'talk': talk,

@@ -7,7 +7,10 @@ from computer.environment import config, env, logger
 from computer.util import get_all_assistants
 
 def add_conversation_parsers(subparser):
-    restart_parser = subparser.add_parser('restart', help='restart conversation')
+    next_parser = subparser.add_parser('next', help='next conversation')
+    next_parser.add_argument('message', nargs='?', help='message to assistant')
+    next_parser.add_argument('-a', '--assistant', help='assistant id or name')
+    next_parser.add_argument('-m', '--model', help='model name')
     retrieve_parser = subparser.add_parser('retrieve', help='retrieve conversation')
     retrieve_parser.add_argument('-f', '--footnotes', action='store_true', help='print footnotes')
     select_parser = subparser.add_parser('select', help='select assistant')
@@ -257,7 +260,7 @@ def retrieve(args):
             print('Ignore print_footnotes option because messages are created by chat completion', file=sys.stderr)
         _print_chat_completion_messages(thread_profile)
 
-def talk(args):
+def _talk(args):
     if args.model:
         env.set('OPENAI_MODEL_NAME', args.model)
 
@@ -269,14 +272,7 @@ def talk(args):
     if args.assistant:
         pattern = args.assistant
     else:
-        pattern = None        
-
-    try:
-        assistant_always_reassigned = config.retrieve('assistant_always_reassigned')
-        if assistant_always_reassigned and strtobool(assistant_always_reassigned):
-            _unselect_assistant()
-    except ValueError:
-        pass
+        pattern = None
 
     _select_thread_and_assistant(pattern, user_message)
     thread_profile = env.retrieve('thread')
@@ -285,3 +281,10 @@ def talk(args):
         _talk_with_assistants(thread_profile, assistant_profile, user_message)
     else:
         _talk_by_chat_completion(thread_profile, user_message)
+
+def talk(args):
+    _unselect_assistant()
+    _talk(args)
+
+def talk_next(args):
+    _talk(args)
