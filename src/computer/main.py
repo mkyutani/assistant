@@ -39,11 +39,11 @@ def main():
     set_io_buffers()
 
     parser = argparse.ArgumentParser(description='conversation')
-    conversation_subparser = parser.add_subparsers(dest='command', title='conversation command', required=True)
-    add_conversation_parsers(conversation_subparser)
-    add_assistant_parsers(conversation_subparser)
-    add_file_parsers(conversation_subparser)
-    add_config_parsers(conversation_subparser)
+    subparser = parser.add_subparsers(dest='command', title='conversation', required=True)
+    add_conversation_parsers(subparser)
+    add_assistant_parsers(subparser)
+    add_file_parsers(subparser)
+    add_config_parsers(subparser)
 
     args = parser.parse_args()
 
