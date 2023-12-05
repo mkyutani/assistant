@@ -64,8 +64,6 @@ def create_assistant(args):
     )
     logger.debug(f'Create assistant object: {assistant}')
 
-    env.store(('assistant', assistant.id))
-
     print(separator.join([assistant.id, assistant.name]))
 
 def delete_assistant(args):

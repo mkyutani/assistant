@@ -1,4 +1,5 @@
-from computer.environment import env
+import sys
+from computer.environment import config, env
 
 def add_config_parsers(subparser):
     subcommand_parser = subparser.add_parser('config', help='config command')
@@ -6,52 +7,49 @@ def add_config_parsers(subparser):
     list_parser = subcommand_subparser.add_parser('list', help='List items')
     print_parser = subcommand_subparser.add_parser('print', help='Print item')
     print_parser.add_argument('name', help='name')
+    remove_parser = subcommand_subparser.add_parser('remove', help='Remove item')
+    remove_parser.add_argument('name', help='name')
     set_parser = subcommand_subparser.add_parser('set', help='Set item')
     set_parser.add_argument('name', help='name')
     set_parser.add_argument('value', nargs='?', help='value')
-    unset_parser = subcommand_subparser.add_parser('unset', help='Unset item')
-    unset_parser.add_argument('name', help='name')
 
 def _print_config(name=None):
-    config = env.retrieve('config')
-    if config:
-        for c in config:
-            if not name or c == name:
-                print(f'{c}={config.get(c)}')
+    try:
+        if name:
+            values = {name: config.retrieve(name)}
+        else:
+            values = config.retrieve_all()
+
+        for name, value in values.items():
+            print(f'{name}={value}')
+    except KeyError:
+        print('No such a configuration item', file=sys.stderr)
 
 def list_config(args):
     _print_config()
 
 def print_config(args):
-    name = args.name
-    _print_config(name=name)
+    _print_config(name=args.name)
 
 def set_config(args):
     name = args.name
     value = args.value
 
-    config = env.retrieve('config')
-    if not config:
-        config = {}
-
     if not value:
-        nv = name.split('=', 1)
-        name = nv[0]
-        if len(nv) == 2:
-            value = nv[1]
+        name_with_value = name.split('=', 1)
+        name = name_with_value[0]
+        if len(name_with_value) == 2:
+            value = name_with_value[1]
         else:
             value = ''
-    config[name] = value
 
-    env.store('config', config)
+    try:
+        config.store(name, value)
+    except KeyError:
+        print('No such a configuration item', file=sys.stderr)
 
-def unset_config(args):
-    name = args.name
-
-    config = env.retrieve('config')
-    if config:
-        try:
-            del config[name]
-            env.store('config', config)
-        except Exception:
-            pass
+def remove_config(args):
+    try:
+        config.remove(args.name)
+    except KeyError:
+        print('No such a configuration item', file=sys.stderr)

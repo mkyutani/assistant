@@ -1,8 +1,9 @@
+from distutils.util import strtobool
 import re
 import sys
 from time import sleep
 import openai
-from computer.environment import env, logger
+from computer.environment import config, env, logger
 from computer.util import get_all_assistants
 
 def add_conversation_parsers(subparser):
@@ -38,7 +39,7 @@ Which assistant best answers the following question?
 
 def _select_assistant_name_by_chat_completions(auto_select_message):
     response = openai.chat.completions.create(
-        model = env.get('OPENAI_MODEL_NAME'),
+        model = config.retrieve('auto_select_model_name'),
         messages = [
             { 'role': 'user', 'content': auto_select_message }
         ]
@@ -269,6 +270,13 @@ def talk(args):
         pattern = args.assistant
     else:
         pattern = None        
+
+    try:
+        assistant_always_reassigned = config.retrieve('assistant_always_reassigned')
+        if assistant_always_reassigned and strtobool(assistant_always_reassigned):
+            _unselect_assistant()
+    except ValueError:
+        pass
 
     _select_thread_and_assistant(pattern, user_message)
     thread_profile = env.retrieve('thread')

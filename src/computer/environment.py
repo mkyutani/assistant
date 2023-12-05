@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from enum import Enum
 from loguru import logger as loguru_logger
 
 class Env:
@@ -54,7 +55,7 @@ class Env:
     def _remove_memory(self, name):
         try:
             del self._memory[name]
-        except KeyError as e:
+        except KeyError:
             pass
 
     def get(self, name):
@@ -80,5 +81,57 @@ class Env:
         self._remove_memory(name)
         self._save_memory()
 
+class Config:
+
+    _global_config_names = [
+        'auto_select_model_name',
+        'assistant_always_reassigned'
+    ]
+
+    def __new__(cls, *args, **kargs):
+        if not hasattr(cls, '_instance'):
+            cls._instance = super(Config, cls).__new__(cls)
+
+            config = env.retrieve('config')
+            if not config:
+                config = {}
+
+            for n in cls._global_config_names:
+                if not n in config:
+                    config[n] = None
+
+            env.store('config', config)
+
+        return cls._instance
+
+    def retrieve(self, name):
+        if name not in self._global_config_names:
+            raise KeyError
+
+        config = env.retrieve('config')
+        value = config.get(name)
+        return value
+
+    def retrieve_all(self):
+        config = env.retrieve('config')
+        return config
+
+    def store(self, name, value):
+        if name not in self._global_config_names:
+            raise KeyError
+
+        config = env.retrieve('config')
+        config[name] = value
+        env.store('config', config)
+
+    def remove(self, name):
+        if name not in self._global_config_names:
+            raise KeyError
+
+        config = env.retrieve('config')
+        config[name] = None
+        env.store('config', config)
+
 env = Env()
 logger = Env().logger()
+config = Config()

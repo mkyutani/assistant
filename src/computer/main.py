@@ -3,7 +3,7 @@ import io
 import sys
 
 from computer.assistant import add_assistant_parsers, create_assistant, delete_assistant, list_assistants
-from computer.config import add_config_parsers, list_config, print_config, set_config, unset_config
+from computer.config import add_config_parsers, list_config, print_config, set_config, remove_config
 from computer.conversation import add_conversation_parsers, restart, retrieve, select, talk, unselect
 from computer.file import add_file_parsers, create_file, list_files
 
@@ -17,7 +17,7 @@ command_functions = {
         'list': list_config,
         'print': print_config,
         'set': set_config,
-        'unset': unset_config
+        'remove': remove_config
     },
     'file': {
         'create': create_file,
